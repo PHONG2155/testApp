@@ -13,7 +13,7 @@ package.domain = org.test
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-requirements = python3,kivy==2.3.1,requests,certifi,urllib3,charset-normalizer,idna,sqlite3
+requirements = python3,kivy==2.3.1,requests,certifi,urllib3,charset-normalizer,idna
 
 # (list) List of inclusions using pattern matching
 #source.include_patterns = assets/*,images/*.png
