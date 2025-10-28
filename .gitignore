@@ -1,0 +1,22 @@
+# Buildozer / Android build stuff
+.buildozer/
+bin/
+*.apk
+*.aab
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.spec
+
+# Virtual env
+venv/
+.env/
+.venv/
+
+# OS junk
+*.log
+.DS_Store
+Thumbs.db

@@ -261,7 +261,7 @@ android.minapi = 21
 
 # (list) Android application meta-data to set (key=value format)
 #android.meta_data =
-
+android.build_tools_version = 33.0.1
 # (list) Android library project to add (will be added in the
 # project.properties automatically.)
 #android.library_references =
