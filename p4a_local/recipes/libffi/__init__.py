@@ -1,16 +1,22 @@
 from pythonforandroid.recipe import Recipe
 
-
 class LibffiRecipe(Recipe):
+    """
+    Stub libffi recipe for CI:
+    - Không chạy autogen.sh
+    - Không chạy configure/make
+    - Không build gì hết
+    - Giả vờ như libffi đã có sẵn
+    """
     name = "libffi"
-    version = "fake-prebuilt-for-ci"
-    url = None  # we are not downloading source
+    version = "ci-prebuilt-skip"
+    url = None  # không download source
 
     def should_build(self, arch):
-        # Pretend it's already built to skip compile steps
+        # nói với p4a rằng: không cần build lại nữa
         return False
 
     def build_arch(self, arch):
-        # Do nothing: skip ./autogen.sh, ./configure, make, etc.
-        print("Using stub libffi for CI (no build)")
+        # cố ý không làm gì
+        print("Using stubbed libffi on CI, skipping build.")
         return
