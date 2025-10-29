@@ -32,17 +32,32 @@ jobs:
       - name: Install system build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            autoconf automake libtool pkg-config build-essential unzip zip
+          sudo apt-get install -y autoconf automake libtool pkg-config build-essential unzip zip
 
-      - name: Dummy buildozer warmup
+      - name: Warm up buildozer
         run: |
           buildozer android p4a -- version || true
-          ls -R .
-          echo "Warmup finished"
-      
-      - name: Upload placeholder
+          echo "Warmup done ✅"
+
+      - name: Patch libffi recipe (disable autogen)
+        run: |
+          LIBFFI_PATH=".buildozer/android/platform/python-for-android/pythonforandroid/recipes/libffi/__init__.py"
+          if [ -f "$LIBFFI_PATH" ]; then
+            echo "Patching $LIBFFI_PATH..."
+            # Comment out any autogen.sh or autoreconf calls
+            sed -i 's/shprint.*autogen\.sh.*/print("Skip autogen.sh on CI")/g' "$LIBFFI_PATH"
+            sed -i 's/shprint.*autoreconf.*/print("Skip autoreconf on CI")/g' "$LIBFFI_PATH"
+            echo "✅ Patched libffi recipe successfully."
+          else
+            echo "⚠️ libffi recipe not found (maybe not downloaded yet)"
+          fi
+
+      - name: Build APK (debug)
+        run: |
+          buildozer android debug
+
+      - name: Upload built APK
         uses: actions/upload-artifact@v4
         with:
-          name: placeholder
-          path: main.py
+          name: myapp-debug.apk
+          path: bin/*-debug.apk
