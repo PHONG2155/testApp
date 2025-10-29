@@ -34,25 +34,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y autoconf automake libtool pkg-config build-essential unzip zip
 
-      - name: Warm up buildozer
+      - name: Warm up buildozer (download SDK/NDK etc.)
         run: |
+          # chạy 1 lệnh nhẹ để buộc buildozer tải python-for-android, SDK/NDK, v.v.
           buildozer android p4a -- version || true
           echo "Warmup done ✅"
 
-      - name: Patch libffi recipe (disable autogen)
-        run: |
-          LIBFFI_PATH=".buildozer/android/platform/python-for-android/pythonforandroid/recipes/libffi/__init__.py"
-          if [ -f "$LIBFFI_PATH" ]; then
-            echo "Patching $LIBFFI_PATH..."
-            # Comment out any autogen.sh or autoreconf calls
-            sed -i 's/shprint.*autogen\.sh.*/print("Skip autogen.sh on CI")/g' "$LIBFFI_PATH"
-            sed -i 's/shprint.*autoreconf.*/print("Skip autoreconf on CI")/g' "$LIBFFI_PATH"
-            echo "✅ Patched libffi recipe successfully."
-          else
-            echo "⚠️ libffi recipe not found (maybe not downloaded yet)"
-          fi
-
-      - name: Build APK (debug)
+      - name: Build APK (debug) using local libffi stub
+        env:
+          P4A_LOCAL_RECIPES: ./p4a_local/recipes
         run: |
           buildozer android debug
 
