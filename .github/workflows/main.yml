@@ -10,44 +10,54 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      # 1. Lấy code
+      # 1. Lấy source code
       - name: Lấy code về (Checkout code)
         uses: actions/checkout@v4
 
-      # 2. Java 17 cho Gradle / Android
+      # 2. Java JDK 17 cho Gradle/Android
       - name: Thiết lập Java (Setup Java JDK 17)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      # 3. Python (3.10 ổn định với python-for-android + Kivy)
+      # 3. Python 3.10 (ổn định nhất với p4a/Kivy)
       - name: Thiết lập Python (Setup Python 3.10)
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      # 4. Cài gói hệ thống cần cho toolchain C, libffi, autoconf/libtool
-      - name: Cài đặt gói hệ thống bắt buộc (NDK/autoconf/libtool/zip)
+      # 4. Toolchain hệ thống để p4a build libffi, openssl, hostpython,...
+      - name: Cài đặt gói hệ thống bắt buộc (autotools, NDK deps, zip)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            autoconf automake libtool libtool-bin \
-            pkg-config build-essential cmake \
-            zip unzip
+            autoconf \
+            automake \
+            libtool \
+            libtool-bin \
+            pkg-config \
+            build-essential \
+            cmake \
+            zip \
+            unzip \
+            gettext \
+            gperf \
+            m4 \
+            python3-setuptools
 
-      # 5. Cài buildozer + python-for-android + cython
+      # 5. Cài buildozer + python-for-android (pin version stable) + cython
       - name: Cài đặt Buildozer / python-for-android / Cython
         run: |
           python -m pip install --upgrade pip
-          pip install "cython<3.1" buildozer python-for-android
+          pip install "cython<3.1" buildozer "python-for-android==2024.1.21"
 
       # 6. Build APK debug
       - name: Chạy Buildozer (Build APK debug)
         run: |
           buildozer -v android debug
 
-      # 7. Upload file APK ra Artifact
+      # 7. Upload APK đã build
       - name: Tải file APK lên (Upload Artifact)
         uses: actions/upload-artifact@v4
         with:
