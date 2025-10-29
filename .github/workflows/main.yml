@@ -7,60 +7,118 @@ on:
 
 jobs:
   build-apk:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     steps:
-      # 1. Lấy source code
-      - name: Lấy code về (Checkout code)
+      # 1. Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Thiết lập Java JDK 17 cho Gradle/Android
-      - name: Thiết lập Java (Setup Java JDK 17)
+      # 2. Install JDK 17
+      - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "17"
+          distribution: 'temurin'
+          java-version: '17'
 
-      # 3. Thiết lập Python 3.10 (ổn định với python-for-android)
-      - name: Thiết lập Python (Setup Python 3.10)
+      # 3. Install Python 3.10 (p4a ổn định hơn với 3.10)
+      - name: Setup Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: '3.10'
 
-      # 4. Cài toolchain cần để build native libs (libffi, openssl, v.v.)
-      - name: Cài đặt gói hệ thống bắt buộc (autotools, NDK deps, zip)
+      # 4. Upgrade pip + install buildozer + cython
+      - name: Install buildozer + deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install "cython<3.1" buildozer
+
+      # 5. Install system packages needed by p4a / buildozer
+      - name: Install system build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            autoconf \
-            automake \
-            libtool \
-            libtool-bin \
-            pkg-config \
-            build-essential \
-            cmake \
-            zip \
-            unzip \
-            gettext \
-            gperf \
-            m4 \
-            python3-setuptools
+            autoconf automake libtool pkg-config build-essential unzip zip
 
-      # 5. Cài buildozer + python-for-android (pin bản ổn định) + cython
-      - name: Cài đặt Buildozer / python-for-android / Cython
+      # 6. Patch python-for-android libffi recipe before build
+      #    - Gọi buildozer init build dir 1 lần để nó tạo .buildozer/
+      #    - Sau đó sửa file libffi recipe gốc để bỏ autogen.sh
+      - name: Pre-warm buildozer and patch libffi recipe
         run: |
-          python -m pip install --upgrade pip
-          pip install "cython<3.1" buildozer "python-for-android==2024.1.21"
+          # chạy lệnh nhẹ để buildozer download p4a vào .buildozer
+          buildozer android p4a -- version || true
 
-      # 6. Build APK debug
-      - name: Chạy Buildozer (Build APK debug)
+          # Đường dẫn recipe libffi thật sự mà p4a đang dùng
+          LIBFFI_RECIPE=".buildozer/android/platform/python-for-android/pythonforandroid/recipes/libffi/__init__.py"
+
+          echo "Patching $LIBFFI_RECIPE ..."
+
+          cat > $LIBFFI_RECIPE << 'EOF'
+from pythonforandroid.recipe import Recipe
+from pythonforandroid.logger import shprint
+from pythonforandroid.toolchain import current_directory
+import sh
+import os
+
+class LibffiRecipe(Recipe):
+    version = "3.4.4"
+    url = "https://github.com/libffi/libffi/releases/download/v{version}/libffi-{version}.tar.gz"
+    built_libraries = {"libffi.so": "install/lib"}
+    depends = []
+    patches = []
+
+    def should_build(self, arch):
+        return True  # always rebuild in CI
+
+    def build_arch(self, arch):
+        build_dir = self.get_build_dir(arch.arch)
+        install_dir = self.get_build_dir(arch.arch) + "/install"
+
+        # env cho cross compile
+        env = arch.get_env()
+        env["CC"] = arch.get_env()["CC"]
+        env["CFLAGS"] = env.get("CFLAGS", "") + " -fPIC"
+        env["LDFLAGS"] = env.get("LDFLAGS", "") + " -fPIC"
+        env["AR"] = arch.get_env().get("AR", env["CC"] + " -ar")
+        env["RANLIB"] = arch.get_env().get("RANLIB", "ranlib")
+
+        host = arch.command_prefix  # e.g. aarch64-linux-android
+
+        with current_directory(build_dir):
+            # Một số bản release libffi đã có sẵn configure,
+            # không cần chạy autogen.sh / autoreconf
+            if not os.path.exists("configure"):
+                # fallback trong TH rất hiếm, nhưng cứ in log
+                print("configure not found in libffi src")
+
+            shprint(
+                sh.Command("./configure"),
+                "--host={}".format(host),
+                "--prefix={}".format(install_dir),
+                "--disable-static",
+                "--enable-shared",
+                _env=env,
+            )
+            shprint(sh.make, "-j4", _env=env)
+            shprint(sh.make, "install", _env=env)
+
+        # sau khi cài đặt, p4a expect .so trong install/lib hoặc install/lib64
+        # nên ta để built_libraries ở install/lib (ở trên)
+        print("libffi build/patched OK for arch", arch.arch)
+
+recipe = LibffiRecipe()
+EOF
+
+          echo "Patch done."
+
+      # 7. Build APK debug
+      - name: Run Buildozer (build debug APK)
         run: |
-          export P4A_LOCAL_RECIPES="$GITHUB_WORKSPACE/p4a_local/recipes"
-          buildozer -v android debug
+          buildozer android debug
 
-      # 7. Upload APK đã build xong
-      - name: Tải file APK lên (Upload Artifact)
+      # 8. Upload APK artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk-debug
-          path: bin/*.apk
+          name: myapp-debug.apk
+          path: bin/*-debug.apk
