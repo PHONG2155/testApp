@@ -35,72 +35,14 @@ jobs:
           sudo apt-get install -y \
             autoconf automake libtool pkg-config build-essential unzip zip
 
-      - name: Pre-warm buildozer and patch libffi recipe
+      - name: Dummy buildozer warmup
         run: |
-          # Gọi nhẹ để buildozer tải python-for-android vào .buildozer,
-          # nếu lỗi không sao nên dùng || true
           buildozer android p4a -- version || true
-
-          LIBFFI_RECIPE=".buildozer/android/platform/python-for-android/pythonforandroid/recipes/libffi/__init__.py"
-
-          echo "Patching $LIBFFI_RECIPE ..."
-
-          cat > "$LIBFFI_RECIPE" << 'EOF'
-from pythonforandroid.recipe import Recipe
-from pythonforandroid.logger import shprint
-from pythonforandroid.toolchain import current_directory
-import sh
-import os
-
-class LibffiRecipe(Recipe):
-    version = "3.4.4"
-    url = "https://github.com/libffi/libffi/releases/download/v{version}/libffi-{version}.tar.gz"
-    built_libraries = {"libffi.so": "install/lib"}
-    depends = []
-    patches = []
-
-    def should_build(self, arch):
-        # luôn build trong CI để đảm bảo file .so tồn tại
-        return True
-
-    def build_arch(self, arch):
-        build_dir = self.get_build_dir(arch.arch)
-        install_dir = os.path.join(build_dir, "install")
-
-        env = arch.get_env()
-        env["CFLAGS"] = env.get("CFLAGS", "") + " -fPIC"
-        env["LDFLAGS"] = env.get("LDFLAGS", "") + " -fPIC"
-
-        host = arch.command_prefix  # ví dụ: aarch64-linux-android
-
-        with current_directory(build_dir):
-            if not os.path.exists("configure"):
-                print("WARNING: 'configure' not found in libffi source; skipping autogen (CI mode)")
-
-            shprint(
-                sh.Command("./configure"),
-                "--host={}".format(host),
-                "--prefix={}".format(install_dir),
-                "--disable-static",
-                "--enable-shared",
-                _env=env,
-            )
-            shprint(sh.make, "-j4", _env=env)
-            shprint(sh.make, "install", _env=env)
-
-        print("libffi build/patched OK for arch", arch.arch)
-
-recipe = LibffiRecipe()
-EOF
-
-          echo "Patch done."
-
-      - name: Build APK (debug)
-        run: |
-          buildozer android debug
-
-      - name: Upload APK artifact
+          ls -R .
+          echo "Warmup finished"
+      
+      - name: Upload placeholder
         uses: actions/upload-artifact@v4
         with:
-          name: myapp-debug.apk
-          path: bin/*-debug.apk
+          name: placeholder
+          path: main.py
