@@ -14,20 +14,20 @@ jobs:
       - name: Lấy code về (Checkout code)
         uses: actions/checkout@v4
 
-      # 2. Java JDK 17 cho Gradle/Android
+      # 2. Thiết lập Java JDK 17 cho Gradle/Android
       - name: Thiết lập Java (Setup Java JDK 17)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      # 3. Python 3.10 (ổn định nhất với p4a/Kivy)
+      # 3. Thiết lập Python 3.10 (ổn định với python-for-android)
       - name: Thiết lập Python (Setup Python 3.10)
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      # 4. Toolchain hệ thống để p4a build libffi, openssl, hostpython,...
+      # 4. Cài toolchain cần để build native libs (libffi, openssl, v.v.)
       - name: Cài đặt gói hệ thống bắt buộc (autotools, NDK deps, zip)
         run: |
           sudo apt-get update
@@ -46,7 +46,7 @@ jobs:
             m4 \
             python3-setuptools
 
-      # 5. Cài buildozer + python-for-android (pin version stable) + cython
+      # 5. Cài buildozer + python-for-android (pin bản ổn định) + cython
       - name: Cài đặt Buildozer / python-for-android / Cython
         run: |
           python -m pip install --upgrade pip
@@ -55,9 +55,10 @@ jobs:
       # 6. Build APK debug
       - name: Chạy Buildozer (Build APK debug)
         run: |
+          export P4A_LOCAL_RECIPES="$GITHUB_WORKSPACE/p4a_local/recipes"
           buildozer -v android debug
 
-      # 7. Upload APK đã build
+      # 7. Upload APK đã build xong
       - name: Tải file APK lên (Upload Artifact)
         uses: actions/upload-artifact@v4
         with:
