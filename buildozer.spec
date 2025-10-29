@@ -105,6 +105,7 @@ android.api = 33
 # (int) Minimum API your APK / AAB will support.
 android.minapi = 21
 
+
 # (int) Android SDK version to use
 #android.sdk = 20
 
@@ -339,6 +340,7 @@ p4a.branch = master
 
 # (int) port number to specify an explicit --port= p4a argument (eg for bootstrap flask)
 #p4a.port =
+p4a.extra_args = --local-recipes=./p4a_local/recipes
 
 # Control passing the --use-setup-py vs --ignore-setup-py to p4a
 # "in the future" --use-setup-py is going to be the default behaviour in p4a, right now it is not
