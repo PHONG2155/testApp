@@ -10,50 +10,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Install JDK 17
       - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3. Install Python 3.10 (p4a ổn định hơn với 3.10)
       - name: Setup Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 4. Upgrade pip + install buildozer + cython
       - name: Install buildozer + deps
         run: |
           python -m pip install --upgrade pip
           pip install "cython<3.1" buildozer
 
-      # 5. Install system packages needed by p4a / buildozer
       - name: Install system build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake libtool pkg-config build-essential unzip zip
 
-      # 6. Patch python-for-android libffi recipe before build
-      #    - Gọi buildozer init build dir 1 lần để nó tạo .buildozer/
-      #    - Sau đó sửa file libffi recipe gốc để bỏ autogen.sh
       - name: Pre-warm buildozer and patch libffi recipe
         run: |
-          # chạy lệnh nhẹ để buildozer download p4a vào .buildozer
+          # Gọi nhẹ để buildozer tải python-for-android vào .buildozer,
+          # nếu lỗi không sao nên dùng || true
           buildozer android p4a -- version || true
 
-          # Đường dẫn recipe libffi thật sự mà p4a đang dùng
           LIBFFI_RECIPE=".buildozer/android/platform/python-for-android/pythonforandroid/recipes/libffi/__init__.py"
 
           echo "Patching $LIBFFI_RECIPE ..."
 
-          cat > $LIBFFI_RECIPE << 'EOF'
+          cat > "$LIBFFI_RECIPE" << 'EOF'
 from pythonforandroid.recipe import Recipe
 from pythonforandroid.logger import shprint
 from pythonforandroid.toolchain import current_directory
@@ -68,28 +60,22 @@ class LibffiRecipe(Recipe):
     patches = []
 
     def should_build(self, arch):
-        return True  # always rebuild in CI
+        # luôn build trong CI để đảm bảo file .so tồn tại
+        return True
 
     def build_arch(self, arch):
         build_dir = self.get_build_dir(arch.arch)
-        install_dir = self.get_build_dir(arch.arch) + "/install"
+        install_dir = os.path.join(build_dir, "install")
 
-        # env cho cross compile
         env = arch.get_env()
-        env["CC"] = arch.get_env()["CC"]
         env["CFLAGS"] = env.get("CFLAGS", "") + " -fPIC"
         env["LDFLAGS"] = env.get("LDFLAGS", "") + " -fPIC"
-        env["AR"] = arch.get_env().get("AR", env["CC"] + " -ar")
-        env["RANLIB"] = arch.get_env().get("RANLIB", "ranlib")
 
-        host = arch.command_prefix  # e.g. aarch64-linux-android
+        host = arch.command_prefix  # ví dụ: aarch64-linux-android
 
         with current_directory(build_dir):
-            # Một số bản release libffi đã có sẵn configure,
-            # không cần chạy autogen.sh / autoreconf
             if not os.path.exists("configure"):
-                # fallback trong TH rất hiếm, nhưng cứ in log
-                print("configure not found in libffi src")
+                print("WARNING: 'configure' not found in libffi source; skipping autogen (CI mode)")
 
             shprint(
                 sh.Command("./configure"),
@@ -102,8 +88,6 @@ class LibffiRecipe(Recipe):
             shprint(sh.make, "-j4", _env=env)
             shprint(sh.make, "install", _env=env)
 
-        # sau khi cài đặt, p4a expect .so trong install/lib hoặc install/lib64
-        # nên ta để built_libraries ở install/lib (ở trên)
         print("libffi build/patched OK for arch", arch.arch)
 
 recipe = LibffiRecipe()
@@ -111,12 +95,10 @@ EOF
 
           echo "Patch done."
 
-      # 7. Build APK debug
-      - name: Run Buildozer (build debug APK)
+      - name: Build APK (debug)
         run: |
           buildozer android debug
 
-      # 8. Upload APK artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
